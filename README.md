@@ -8,8 +8,7 @@
 
 
 ```bash
-cd /home/BetterClan
-chmod +x build build.sh scripts/setup-database.sh gradlew   # einmalig
+chmod +x build build.sh scripts/setup-database.sh gradlew
 ./build
 ```
 
