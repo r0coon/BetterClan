@@ -1,0 +1,44 @@
+name: BetterClan
+main: com.betterclan.BetterClanPlugin
+version: "0.9.0-beta.1"
+api-version: "1.21"
+
+authors: [l]
+description: actually this is mine
+prefix: BetterClan
+
+softdepend:
+  - ProtocolLib
+  - PlaceholderAPI
+
+commands:
+  clan:
+    description: Ruft das Clan GUI auf, um es zu verwalten bla bla bla -> Keine Befehle sondern nur lediglich GUI
+    usage: /clan
+
+  chat:
+    description: Clan- und Allianzen-Chat
+    usage: /chat <clan|ally> <Nachricht>
+    permission: betterclan.chat
+
+  sca:
+    description: Admin GUI für die Clan-Verwaltung
+    permission: betterclan.admin
+    usage: /sca <menu|user|clan>
+
+
+permissions:
+  betterclan.*:
+    description: Alle BetterClan Rechte
+    default: op
+    children:
+      betterclan.admin: true
+      betterclan.chat: true
+
+  betterclan.admin:
+    description: Zugriff auf Admin Befehle
+    default: op
+
+  betterclan.chat:
+    description: Clan Chat benutzen
+    default: true

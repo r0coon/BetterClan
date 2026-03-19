@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Ohne Argumente: interaktives Setup (optional DB) + Gradle build.
+# Mit Argumenten: nur Gradle (z. B. ./build jar, ./build runServer).
+# Gradle-Ausgabe: .build/ (build.gradle) — keine Kollision mit dieser Datei.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+WRAPPER_JAR="$ROOT/gradle/wrapper/gradle-wrapper.jar"
+GRADLE_VER="8.14.4"
+
+ensure_wrapper_jar() {
+  if [[ -f "$WRAPPER_JAR" && -s "$WRAPPER_JAR" ]]; then
+    return 0
+  fi
+
+  echo "gradle-wrapper.jar fehlt oder ist leer — wird beschafft …" >&2
+  mkdir -p "$ROOT/gradle/wrapper"
+
+  if command -v gradle >/dev/null 2>&1; then
+    gradle wrapper --gradle-version "$GRADLE_VER" --distribution-type all
+    return 0
+  fi
+
+  local url="https://github.com/gradle/gradle/raw/v${GRADLE_VER}/gradle/wrapper/gradle-wrapper.jar"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -o "$WRAPPER_JAR" "$url"
+    return 0
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -q -O "$WRAPPER_JAR" "$url"
+    return 0
+  fi
+
+  echo "Weder gradle noch curl/wget gefunden. Bitte Gradle installieren:" >&2
+  echo "  gradle wrapper --gradle-version $GRADLE_VER" >&2
+  exit 1
+}
+
+ensure_wrapper_jar
+
+if [[ ! -x "$ROOT/gradlew" ]]; then
+  chmod +x "$ROOT/gradlew" || true
+fi
+
+# Mit Argumenten: nur Gradle
+if [[ $# -gt 0 ]]; then
+  exec "$ROOT/gradlew" "$@"
+fi
+
+# Automatisierung ohne Dialog
+if [[ -n "${SKIP_SETUP:-}" ]]; then
+  exec "$ROOT/gradlew" build
+fi
+
+echo ""
+echo "BetterClan – Setup"
+echo "=================="
+echo ""
+echo "Möchtest du eine Datenbank nutzen (MariaDB / MySQL / PostgreSQL)?"
+echo "  Ja  → scripts/setup-database.sh, danach wird gebaut."
+echo "  Nein → nur bauen (Speicher wie in config.yml, z. B. JSON)."
+echo ""
+read -rp "Datenbank nutzen? [j/N]: " db_choice
+db_norm="$(printf '%s' "$db_choice" | tr '[:upper:]' '[:lower:]')"
+
+if [[ "$db_norm" == j || "$db_norm" == ja || "$db_norm" == y || "$db_norm" == yes ]]; then
+  echo ""
+  bash "$ROOT/scripts/setup-database.sh"
+else
+  echo ""
+  echo "Überspringe Datenbank-Setup."
+fi
+
+echo ""
+echo "→ Baue Plugin …"
+"$ROOT/gradlew" build
+
+echo ""
+echo "Fertig. JAR: ${ROOT}/.build/libs/"

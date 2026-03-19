@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+.build/
+build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+
+# Run-Server (run-paper)
+run/
+
+# Build-Artefakte im Root
+*.jar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+target/

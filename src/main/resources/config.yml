@@ -1,0 +1,140 @@
+# /______________ Database ___________
+# Speichersystem des Plugins (JSON-Datei oder SQL-Datenbank)
+storage:
+  type: database
+  auto-save-interval: 10
+  database:
+    dialect: mariadb
+    host: localhost
+    port: 3306
+    database: betterclan
+    username: betterclan
+    password: admin
+    pool-size: 5
+clan:
+  # Mitglieder-Limit pro Level: base + (level-1) * members-per-level
+  base-max-members: 10
+  members-per-level: 2
+
+  # Höchstes erreichbares Clan-Level
+  max-level: 6
+
+  # Maximale aktive Bündnisse pro Clan
+  max-allies: 5
+
+  # Wie viele Banner-Muster ein Clan maximal haben darf
+  banner-max-patterns: 6
+
+  # Friendly Fire für neu erstellte Clans standardmäßig aktiv?
+  default-friendly-fire: false
+
+
+# /______________ Ranks ___________
+ranks:
+  # Maximale Anzahl ALLER Ränge in einem Clan (inkl. Anführer + Mitglied)
+  max-total-ranks: 28
+
+
+# /______________ Default Permissions ___________
+# Rechte, die der Standard-Rang "Mitglied" bei neuen Clans bekommt
+permissions:
+  # Mögliche Werte: INVITE, KICK, PROMOTE, VAULT, SETTINGS, WAR, ALLY,
+  # SET_BASE, VIEW_LOG, TELEPORT, CHAT_ALLY, CLAN_CHAT, RENAME,
+  # SET_TAG, FRIENDLY_FIRE, MANAGE_RANKS
+  member-defaults:
+    - VAULT
+    - VIEW_LOG
+    - TELEPORT
+    - CHAT_ALLY
+    - CLAN_CHAT
+
+
+# /______________ Feature Unlocks ___________
+# Ab welchem Clan-Level einzelne Features freigeschaltet werden
+features:
+  # Dynamische Tag-Farben (Gradient-Menü)
+  dynamic-colors-min-level: 3
+
+  # Zweite Clan-Base / zweiter Warp
+  second-base-min-level: 4
+
+
+# /______________ Progression ___________
+# Kriegssiege als Progression für Clan-Level
+xp:
+  # Fortschrittsbelohnung pro gewonnenem Krieg
+  war-win-reward: 1
+
+  # Benötigter Fortschritt pro Levelaufstieg
+  # Eintrag 1 = Fortschritt bis Level 2, Eintrag 2 = Fortschritt bis Level 3, ...
+  level-thresholds:
+    - 1
+    - 4
+    - 8
+    - 12
+    - 16
+
+
+# /______________ War ___________
+# Regeln und Limits für Clan-Kriege
+war:
+  # Tage bis ein Krieg automatisch abläuft
+  timeout-days: 7
+
+  # Minuten Cooldown nach einem Krieg
+  cooldown-minutes: 60
+
+  # Killziel pro Krieg (konfigurierbar, gilt für jeden Krieg)
+  target-kills: 20
+
+  # Mindestanzahl Clan-Mitglieder für Krieg (anfragen/annahmen)
+  min-clan-size: 1
+
+
+# /______________ Invites ___________
+# Ablaufzeiten für Clan-Einladungen
+invites:
+  # Nach wie vielen Stunden Einladungen verfallen
+  expiry-hours: 48
+
+
+# /______________ Vault ___________
+# Größe des Clan-Vaults je Clan-Level
+vault:
+  level-1-size: 9
+  level-2-size: 18
+  level-3-size: 27
+  level-4-size: 36
+  level-5-size: 45
+  level-6-size: 54
+
+
+# /______________ Teleport ___________
+# Teleport-Verhalten für Clan-Warps/Basen
+teleport:
+  # Sekunden bis Teleport ausgelöst wird (Abbruch bei Bewegung)
+  countdown-seconds: 5
+
+
+# /______________ Chat ___________
+# Chat-Darstellung und Eingabe-Menüs
+chat:
+  # Clan-Tag im normalen Chat anzeigen
+  show-tag: true
+
+  # Einstellungen für Chat-Input-Dialoge (z. B. Umbenennen/Erstellen)
+  input:
+    # Zeit bis Eingabe automatisch abgebrochen wird
+    timeout-seconds: 30
+
+    # Titel-Animation in Millisekunden/Sekunden
+    title-fade-in-ms: 200
+    title-stay-seconds: 30
+    title-fade-out-ms: 500
+
+
+# /______________ Clan Log ___________
+# Begrenzung der gespeicherten Clan-Log-Einträge
+log:
+  # Maximal gespeicherte Einträge pro Clan
+  max-entries: 100
