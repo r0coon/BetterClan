@@ -1,0 +1,45 @@
+name: BetterClan
+main: com.betterclan.BetterClan
+version: "0.94-SNAPSHOT"
+api-version: "1.21"
+
+authors:
+  - Leverlis
+
+description: Fully GUI-driven clan plugin with wars, alliances, vaults, and ranks.
+prefix: BetterClan
+
+softdepend:
+  - ProtocolLib
+  - PlaceholderAPI
+
+commands:
+  clan:
+    description: Opens the clan management GUI.
+    usage: /clan
+
+  chat:
+    description: Send a message to clan or alliance chat.
+    usage: /chat <clan|ally> <message>
+    permission: betterclan.chat
+
+  sclan:
+    description: Opens the admin management GUI.
+    usage: /sclan
+    permission: betterclan.admin
+
+permissions:
+  betterclan.*:
+    description: Grants all BetterClan permissions.
+    default: op
+    children:
+      betterclan.admin: true
+      betterclan.chat: true
+
+  betterclan.admin:
+    description: Access to the admin GUI and all admin commands.
+    default: op
+
+  betterclan.chat:
+    description: Permission to use clan and alliance chat.
+    default: true

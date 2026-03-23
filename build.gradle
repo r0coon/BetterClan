@@ -1,0 +1,68 @@
+plugins {
+    id 'java'
+    id("xyz.jpenilla.run-paper") version "3.0.2"
+}
+
+// Ausgaben unter .build/ — Standard wäre build/; so gibt es keinen Namenskonflikt mit einer Datei „build“.
+layout.buildDirectory.set(layout.projectDirectory.dir('.build'))
+
+group = "com.betterclan"
+version = "0.94-SNAPSHOT"
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "papermc"
+        url = uri("https://repo.papermc.io/repository/maven-public/")
+    }
+    maven {
+        name = "dmulloy2"
+        url = uri("https://repo.dmulloy2.net/repository/public/")
+    }
+    maven {
+        name = "placeholderapi"
+        url = uri("https://repo.extendedclip.com/content/repositories/placeholderapi/")
+    }
+}
+
+dependencies {
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
+    compileOnly("me.clip:placeholderapi:2.11.6")
+    implementation("com.google.code.gson:gson:2.11.0")
+    implementation("com.zaxxer:HikariCP:5.1.0")
+    implementation("org.mariadb.jdbc:mariadb-java-client:3.4.1")
+    implementation("com.mysql:mysql-connector-j:8.4.0")
+    implementation('org.postgresql:postgresql:42.7.7')
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+tasks {
+    jar {
+
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        from({ configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } })
+    }
+
+    compileJava {
+        options.encoding = "UTF-8"
+        options.release.set(21)
+    }
+
+    runServer {
+        minecraftVersion("1.21.11")
+
+        jvmArgs(
+            "-Dcom.mojang.eula.agree=true",
+            "-DIReallyKnowWhatIAmDoingISwear"
+        )
+
+        dependsOn("build")
+    }
+}
+

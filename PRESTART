@@ -1,0 +1,299 @@
+#!/usr/bin/env bash
+# Without arguments: interactive setup (optional DB) + Gradle build.
+# With arguments:    pass-through to Gradle (e.g. ./build jar, ./build runServer).
+# Gradle output:    .build/  (no collision with this file).
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+WRAPPER_JAR="$ROOT/gradle/wrapper/gradle-wrapper.jar"
+GRADLE_VER="8.14.4"
+
+# ── Gradle wrapper ────────────────────────────────────────────────────────────
+
+ensure_wrapper_jar() {
+  if [[ -f "$WRAPPER_JAR" && -s "$WRAPPER_JAR" ]]; then return 0; fi
+  echo "gradle-wrapper.jar missing or empty — fetching …" >&2
+  mkdir -p "$ROOT/gradle/wrapper"
+  if command -v gradle >/dev/null 2>&1; then
+    gradle wrapper --gradle-version "$GRADLE_VER" --distribution-type all
+    return 0
+  fi
+  local url="https://github.com/gradle/gradle/raw/v${GRADLE_VER}/gradle/wrapper/gradle-wrapper.jar"
+  if command -v curl >/dev/null 2>&1; then curl -fsSL -o "$WRAPPER_JAR" "$url"; return 0; fi
+  if command -v wget >/dev/null 2>&1; then wget -q -O "$WRAPPER_JAR" "$url"; return 0; fi
+  echo "Neither gradle nor curl/wget found. Please install Gradle:" >&2
+  echo "  gradle wrapper --gradle-version $GRADLE_VER" >&2
+  exit 1
+}
+
+ensure_wrapper_jar
+[[ ! -x "$ROOT/gradlew" ]] && chmod +x "$ROOT/gradlew" || true
+
+# Pass-through mode
+if [[ $# -gt 0 ]]; then exec "$ROOT/gradlew" "$@"; fi
+
+# Non-interactive / CI mode
+if [[ -n "${SKIP_SETUP:-}" ]]; then exec "$ROOT/gradlew" build; fi
+
+# ── Database setup helpers ────────────────────────────────────────────────────
+
+have_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+detect_pm() {
+  if   have_cmd apt-get; then echo apt
+  elif have_cmd dnf;     then echo dnf
+  elif have_cmd yum;     then echo yum
+  elif have_cmd pacman;  then echo pacman
+  elif have_cmd apk;     then echo apk
+  elif have_cmd zypper;  then echo zypper
+  else echo unknown
+  fi
+}
+
+can_sudo() { have_cmd sudo && sudo -n true 2>/dev/null || sudo -v 2>/dev/null; }
+
+try_install_pkgs() {
+  local pm pkgs; pm="$(detect_pm)"; pkgs=("$@")
+  case "$pm" in
+    apt)    sudo apt-get update -qq && sudo apt-get install -y "${pkgs[@]}" ;;
+    dnf)    sudo dnf install -y "${pkgs[@]}" ;;
+    yum)    sudo yum install -y "${pkgs[@]}" ;;
+    pacman) sudo pacman -S --noconfirm "${pkgs[@]}" ;;
+    apk)    sudo apk add "${pkgs[@]}" ;;
+    zypper) sudo zypper install -y "${pkgs[@]}" ;;
+    *)      return 1 ;;
+  esac
+}
+
+offer_install_python3() {
+  echo ""
+  echo "Note: python3 is required to update config.yml automatically."
+  read -rp "Install it now (package manager will be detected)? [y/N]: " ans
+  local a; a="$(printf '%s' "$ans" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$a" != j && "$a" != ja && "$a" != y && "$a" != yes ]]; then
+    echo "Aborted: cannot update config.yml without python3."; exit 1
+  fi
+  if ! can_sudo; then
+    echo "No sudo available. Please install python3 manually."; exit 1
+  fi
+  local pm; pm="$(detect_pm)"
+  case "$pm" in
+    apt)    try_install_pkgs python3 python3-minimal || try_install_pkgs python3 ;;
+    dnf|yum|pacman|apk|zypper) try_install_pkgs python3 ;;
+    *)      echo "Unknown package manager. Please install python3 manually."; exit 1 ;;
+  esac
+  have_cmd python3 || { echo "python3 installation failed."; exit 1; }
+  echo "python3 is now available."
+}
+
+DB_CLIENT_OK=1
+
+offer_install_db_client() {
+  local kind="$1"
+  echo ""
+  if [[ "$kind" == "postgres" ]]; then
+    echo "Note: psql (PostgreSQL client) is not installed."
+  else
+    echo "Note: mysql (MariaDB/MySQL client) is not installed."
+  fi
+  echo "      Without it the 'create database automatically' option will be skipped."
+  read -rp "Install the client now? [y/N]: " ans
+  local a; a="$(printf '%s' "$ans" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$a" != j && "$a" != ja && "$a" != y && "$a" != yes ]]; then
+    echo "Skipping — you can create the DB manually; config.yml will still be updated."
+    DB_CLIENT_OK=0; return 0
+  fi
+  if ! can_sudo; then
+    echo "No sudo. Please install the client manually."; DB_CLIENT_OK=0; return 0
+  fi
+  local pm; pm="$(detect_pm)"
+  if [[ "$kind" == "postgres" ]]; then
+    case "$pm" in
+      apt)    try_install_pkgs postgresql-client ;;
+      dnf|yum) try_install_pkgs postgresql ;;
+      pacman|apk|zypper) try_install_pkgs postgresql-client 2>/dev/null || try_install_pkgs postgresql ;;
+      *) echo "Unknown package manager."; DB_CLIENT_OK=0; return 0 ;;
+    esac
+    have_cmd psql && { echo "psql is now available."; DB_CLIENT_OK=1; } \
+                  || { echo "psql installation failed."; DB_CLIENT_OK=0; }
+  else
+    case "$pm" in
+      apt)    try_install_pkgs mariadb-client 2>/dev/null || try_install_pkgs default-mysql-client 2>/dev/null || try_install_pkgs mysql-client ;;
+      dnf|yum) try_install_pkgs mariadb 2>/dev/null || try_install_pkgs mysql ;;
+      pacman) try_install_pkgs mariadb-clients 2>/dev/null || try_install_pkgs mysql-clients ;;
+      apk|zypper) try_install_pkgs mariadb-client 2>/dev/null || try_install_pkgs mysql-client ;;
+      *) echo "Unknown package manager."; DB_CLIENT_OK=0; return 0 ;;
+    esac
+    have_cmd mysql && { echo "mysql client is now available."; DB_CLIENT_OK=1; } \
+                   || { echo "mysql client installation failed."; DB_CLIENT_OK=0; }
+  fi
+}
+
+find_config() {
+  for path in \
+      "$ROOT/run/plugins/BetterClan/config.yml" \
+      "$ROOT/src/main/resources/config.yml" \
+      "$ROOT/config.yml" \
+      "/opt/minecraft/plugins/BetterClan/config.yml"; do
+    [[ -f "$path" ]] && { echo "$path"; return 0; }
+  done
+  local found
+  found="$(find "$ROOT" /opt/minecraft/plugins -maxdepth 8 -name 'config.yml' -path '*/BetterClan/config.yml' 2>/dev/null | head -1)"
+  [[ -n "$found" ]] && { echo "$found"; return 0; }
+  return 1
+}
+
+update_config() {
+  local file="$1"
+  python3 - "$file" "$DB_TYPE" "$DB_HOST" "$DB_PORT" "$DB_NAME" "$DB_USER" "$DB_PASS" <<'PYTHON'
+import sys, re
+file_path, dialect, host, port, db_name, user, pw = sys.argv[1:8]
+with open(file_path, 'r', encoding='utf-8') as f:
+    content = f.read()
+new_block = f"""storage:
+  type: database
+  database:
+    dialect: {dialect}
+    host: {host}
+    port: {port}
+    database: {db_name}
+    username: {user}
+    password: {pw}
+    pool-size: 5
+    auto-save-interval: 10"""
+pattern = r'^storage:.*?(?=\n[a-zA-Z]|\Z)'
+if re.search(pattern, content, re.MULTILINE | re.DOTALL):
+    content = re.sub(pattern, new_block, content, count=1, flags=re.MULTILINE | re.DOTALL)
+else:
+    content = content.rstrip() + '\n\n' + new_block + '\n'
+with open(file_path, 'w', encoding='utf-8') as f:
+    f.write(content)
+PYTHON
+}
+
+setup_database() {
+  echo ""
+  echo "Which database do you want to use?"
+  echo "  1) MariaDB"
+  echo "  2) MySQL"
+  echo "  3) PostgreSQL"
+  echo ""
+  read -rp "Choice [1-3]: " choice
+  case "$choice" in
+    1) DB_TYPE="mariadb";  DB_PORT=3306 ;;
+    2) DB_TYPE="mysql";    DB_PORT=3306 ;;
+    3) DB_TYPE="postgres"; DB_PORT=5432 ;;
+    *) echo "Invalid choice."; exit 1 ;;
+  esac
+  echo "Selected: $DB_TYPE"
+  echo ""
+
+  have_cmd python3 || offer_install_python3
+  [[ "$DB_TYPE" == "postgres" ]] && offer_install_db_client postgres || offer_install_db_client mysql
+
+  read -rp "Host [$DB_HOST]: "           input; DB_HOST="${input:-$DB_HOST}"
+  read -rp "Port [$DB_PORT]: "           input; DB_PORT="${input:-$DB_PORT}"
+  read -rp "Database name [$DB_NAME]: "  input; DB_NAME="${input:-$DB_NAME}"
+  read -rp "Username [$DB_USER]: "       input; DB_USER="${input:-$DB_USER}"
+  while [[ -z "$DB_PASS" ]]; do
+    read -rsp "Password: " DB_PASS; echo ""
+    [[ -z "$DB_PASS" ]] && echo "Password must not be empty."
+  done
+  echo ""
+
+  read -rp "Create the database automatically? [y/N]: " create_db
+  if [[ "$create_db" =~ ^[jJyY]$ ]]; then
+    if [[ "$DB_CLIENT_OK" -ne 1 ]]; then
+      echo "DB client missing — skipping automatic creation. Create the DB manually."
+    elif [[ "$DB_TYPE" == "postgres" ]]; then
+      read -rp "PostgreSQL admin user [postgres]: " pg_admin; pg_admin="${pg_admin:-postgres}"
+      echo "Creating PostgreSQL database and user …"
+      sudo -u "$pg_admin" psql <<SQL
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${DB_USER}') THEN
+    CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASS}';
+  END IF;
+END
+\$\$;
+SELECT 'CREATE DATABASE ${DB_NAME} OWNER ${DB_USER}'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${DB_NAME}')\gexec
+GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
+SQL
+      echo "Done."
+    else
+      read -rsp "Root password for $DB_TYPE (leave empty if none): " root_pass; echo ""
+      echo "Creating database and user …"
+      local mysql_args=(-u root)
+      [[ -n "$root_pass" ]] && mysql_args+=("-p${root_pass}")
+      mysql "${mysql_args[@]}" <<SQL
+CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'%';
+FLUSH PRIVILEGES;
+SQL
+      echo "Done."
+    fi
+    echo ""
+  fi
+
+  if CONFIG_FILE="$(find_config 2>/dev/null)"; then
+    echo "Config found: $CONFIG_FILE"
+    update_config "$CONFIG_FILE"
+    echo "config.yml updated."
+  else
+    echo "WARNING: config.yml not found. Enter the following values manually:"
+    echo ""
+    cat <<EOF
+storage:
+  type: database
+  database:
+    dialect: $DB_TYPE
+    host: $DB_HOST
+    port: $DB_PORT
+    database: $DB_NAME
+    username: $DB_USER
+    password: $DB_PASS
+    pool-size: 5
+    auto-save-interval: 10
+EOF
+  fi
+}
+
+# ── Default DB variables ──────────────────────────────────────────────────────
+DB_TYPE=""
+DB_HOST="localhost"
+DB_PORT=""
+DB_NAME="betterclan"
+DB_USER="betterclan"
+DB_PASS=""
+
+# ── Interactive entry point ───────────────────────────────────────────────────
+echo ""
+echo "BetterClan — Setup"
+echo "=================="
+echo ""
+echo "Do you want to use a database (MariaDB / MySQL / PostgreSQL)?"
+echo "  Yes → configure database connection, then build."
+echo "  No  → build only (storage as set in config.yml, e.g. yaml)."
+echo ""
+read -rp "Use database? [y/N]: " db_choice
+db_norm="$(printf '%s' "$db_choice" | tr '[:upper:]' '[:lower:]')"
+
+if [[ "$db_norm" == j || "$db_norm" == ja || "$db_norm" == y || "$db_norm" == yes ]]; then
+  setup_database
+else
+  echo ""
+  echo "Skipping database setup."
+fi
+
+echo ""
+echo "→ Building plugin …"
+"$ROOT/gradlew" build
+
+echo ""
+echo "Done. JAR: ${ROOT}/.build/libs/"
+

@@ -1,0 +1,81 @@
+storage:   # yaml oder database
+  type: yaml      
+
+#__________ NUR WENN DER TYPE DATABASE VERWENDET WIRD
+# Zur Auswahl stehen => MariaDB / MySQL / PostgreSQL
+  database:
+    dialect: mariadb
+    host: localhost
+    port: 3306
+    database: betterclan
+    username: betterclan
+    password: ...
+
+    pool-size: 5                    # Wie viele Db-Verbindungen gleichzeitig offen sein dürfen
+    auto-save-interval: 10          # Intervall in dem Daten automatisch gespeichert werden
+
+clan:
+  base-max-members: 10              # Standardmäßiges Clan Lvl. 1 Max Members Anzahl
+  members-per-level: 2              # Wie viele zusätzliche Mitglieder pro Level hinzugefügt werden
+  max-allies: 5                     # Maximale aktive Bündnisse pro Clan
+  banner-max-patterns: 6            # Wie viele Banner-Muster ein Clan maximal haben darf
+  default-friendly-fire: false      # Friendly Fire für Clans standardmäßig aktiv?
+
+permissions:        # Permission, die beim erstellen eines Clan direkt den Standardrang an Berechtigungen vergeben wird
+  member-defaults:
+    - VAULT
+    - VIEW_LOG
+    - TELEPORT
+    - CHAT_ALLY
+    - CLAN_CHAT
+
+  # INVITE, KICK, PROMOTE, VAULT, SETTINGS, WAR, ALLY,
+  # SET_BASE, VIEW_LOG, TELEPORT, CHAT_ALLY, CLAN_CHAT, RENAME,
+  # SET_TAG, FRIENDLY_FIRE, MANAGE_RANKS
+
+
+features:
+  dynamic-colors-min-level: 3   # Dynmasche Farben für den Tag freischaltet
+  second-base-min-level: 4      # Zweite Clanbase mind. Lvl.
+
+xp:
+  war-win-reward: 1        # Pro Gewonnen Krieg ein Fortschritts-Punkt zum lvl.
+  level-thresholds:        # Benötigte Kriegssiege für jedes Clan-Level
+    - 1     # Level 2
+    - 4     # Level 3
+    - 8     # usw...
+    - 12
+    - 16
+
+war:
+  timeout-days: 7         # Timeout bis eine Kriegseinladung verfällt
+  cooldown-minutes: 60    # Cooldown nach einem Krieg (bleibt in der mem gsp.)
+  target-kills: 20        # Killziel in einem Clan Krieg
+  min-clan-size: 1        # Mind. Anzahl von Members um sich an einen Krieg zu beteiligen
+
+
+invites:
+  expiry-hours: 48  # Einladungen verfallen nach 48 Stunden
+
+
+vault:              # Größe des Clan-Vaults je Clan-Level
+  level-1-size: 9
+  level-2-size: 18
+  level-3-size: 27
+  level-4-size: 36
+  level-5-size: 45
+  level-6-size: 54
+
+
+teleport:           # Countdown bis der Teleport erfolgt
+  countdown-seconds: 5
+
+
+chat:               # Clan-Tag im Chat anzeigen
+  show-tag: true
+  input:            # Timeout für Eingaben im Chat (z. B. Clanname eingeben)
+    timeout-seconds: 30
+
+
+log:                # Maximal gespeicherte Einträge pro Clan
+  max-entries: 100
